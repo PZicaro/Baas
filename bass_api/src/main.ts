@@ -1,6 +1,7 @@
-import { Logger, ValidationPipe, VersioningType } from '@nestjs/common';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
@@ -17,14 +18,27 @@ async function bootstrap() {
   const port = configService.get<number>('port', 3000);
   const corsOrigin = configService.get<string>('corsOrigin', '*');
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      // Frontend e API vivem em origens diferentes de propósito (portas
+      // distintas). O CORP padrão do helmet ("same-origin") faz o navegador
+      // descartar a resposta antes de entregá-la ao JS — a requisição chega
+      // e é processada normalmente (aparece nos logs), mas o fetch/axios no
+      // browser estoura como "Network Error". Quem já controla as origens
+      // permitidas é o CORS abaixo; aqui só liberamos o CORP para não duplicar
+      // (e conflitar com) essa política.
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+    }),
+  );
+  app.use(cookieParser());
   app.enableCors({
+    // credentials:true exige uma origem explícita (nunca '*') para o
+    // navegador aceitar enviar/receber o cookie httpOnly de sessão.
     origin: corsOrigin === '*' ? true : corsOrigin.split(','),
     credentials: true,
   });
 
   app.setGlobalPrefix(apiPrefix);
-  app.enableVersioning({ type: VersioningType.URI, defaultVersion: '1' });
 
   app.useGlobalPipes(
     new ValidationPipe({

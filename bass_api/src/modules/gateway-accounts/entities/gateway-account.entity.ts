@@ -25,12 +25,16 @@ export class GatewayAccount extends BaseEntity {
   @Column({ length: 20 })
   documento: string;
 
-  /** E-mail usado no cadastro público (POST /api/users) do gateway. */
-  @Column({ name: 'gateway_email', length: 180 })
-  gatewayEmail: string;
+  /**
+   * E-mail/telefone usados no cadastro público (POST /api/users) do gateway.
+   * Nullable porque o login (POST /api/auth/login) pode acontecer numa
+   * sessão separada do cadastro, sem esses dados à mão.
+   */
+  @Column({ name: 'gateway_email', type: 'varchar', length: 180, nullable: true })
+  gatewayEmail: string | null;
 
-  @Column({ name: 'gateway_phone', length: 20 })
-  gatewayPhone: string;
+  @Column({ name: 'gateway_phone', type: 'varchar', length: 20, nullable: true })
+  gatewayPhone: string | null;
 
   /** CodigoCliente recebido por e-mail após o cadastro no gateway. */
   @Column({ name: 'codigo_cliente', length: 100 })

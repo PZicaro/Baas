@@ -17,6 +17,10 @@ export interface AppConfig {
     secret: string;
     expiresIn: string;
   };
+  gateway: {
+    baseUrl: string;
+    encryptionKey: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -37,5 +41,12 @@ export default (): AppConfig => ({
   jwt: {
     secret: process.env.JWT_SECRET ?? 'change-me-in-production',
     expiresIn: process.env.JWT_EXPIRES_IN ?? '1d',
+  },
+  gateway: {
+    baseUrl: process.env.GATEWAY_BASE_URL ?? 'https://api.branchpay.com.br/api',
+    // Chave dedicada para cifrar segredos do gateway (senha do lojista);
+    // cai para JWT_SECRET se não configurada, mas o ideal é ser distinta.
+    encryptionKey:
+      process.env.GATEWAY_ENCRYPTION_KEY ?? process.env.JWT_SECRET ?? 'change-me-in-production',
   },
 });
