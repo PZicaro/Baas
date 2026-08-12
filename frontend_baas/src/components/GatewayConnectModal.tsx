@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { extractErrorMessage } from '../lib/errors';
+import { maskCpfCnpj } from '../lib/masks';
 
 interface GatewayConnectModalProps {
   open: boolean;
@@ -168,8 +169,11 @@ export default function GatewayConnectModal({ open, onClose, onConnected }: Gate
                 <label>CPF/CNPJ</label>
                 <input
                   required
+                  inputMode="numeric"
+                  placeholder="000.000.000-00"
+                  maxLength={18}
                   value={form.document}
-                  onChange={(e) => setField('document', e.target.value)}
+                  onChange={(e) => setField('document', maskCpfCnpj(e.target.value))}
                 />
               </div>
             </div>
@@ -284,8 +288,11 @@ export default function GatewayConnectModal({ open, onClose, onConnected }: Gate
             <label>CPF/CNPJ</label>
             <input
               required
+              inputMode="numeric"
+              placeholder="000.000.000-00"
+              maxLength={18}
               value={loginDocument}
-              onChange={(e) => setLoginDocument(e.target.value)}
+              onChange={(e) => setLoginDocument(maskCpfCnpj(e.target.value))}
             />
             <label>Senha (recebida por e-mail)</label>
             <input
