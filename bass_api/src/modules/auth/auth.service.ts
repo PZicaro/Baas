@@ -43,4 +43,14 @@ export class AuthService {
       role: user.role,
     });
   }
+
+  /**
+   * Calcula o maxAge (ms) do cookie de sessão a partir do `exp` do próprio
+   * JWT, mantendo os dois sempre sincronizados sem duplicar JWT_EXPIRES_IN.
+   */
+  getCookieMaxAge(token: string): number | undefined {
+    const decoded = this.jwtService.decode<{ exp?: number }>(token);
+    if (!decoded?.exp) return undefined;
+    return Math.max(decoded.exp * 1000 - Date.now(), 0);
+  }
 }
