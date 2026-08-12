@@ -65,7 +65,6 @@ export default function PublicPaymentPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [order, setOrder] = useState<OrderResult | null>(null);
-  const [checkingStatus, setCheckingStatus] = useState(false);
 
   const [fees, setFees] = useState<GatewayFee[]>([]);
   const [installments, setInstallments] = useState(1);
@@ -125,19 +124,6 @@ export default function PublicPaymentPage() {
       setError(extractErrorMessage(err, 'Falha ao processar o pagamento.'));
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function handleCheckStatus() {
-    setError(null);
-    setCheckingStatus(true);
-    try {
-      const { data } = await api.get(`/checkout/pay/${slug}/status`);
-      setOrder(data);
-    } catch (err) {
-      setError(extractErrorMessage(err, 'Falha ao consultar o status do pagamento.'));
-    } finally {
-      setCheckingStatus(false);
     }
   }
 
@@ -312,20 +298,10 @@ export default function PublicPaymentPage() {
                   style={{
                     marginTop: 16,
                     display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    gap: 8,
+                    justifyContent: 'center',
                   }}
                 >
                   <span className={`badge ${order.status}`}>{order.status}</span>
-                  <button
-                    type="button"
-                    className="secondary"
-                    disabled={checkingStatus}
-                    onClick={handleCheckStatus}
-                  >
-                    {checkingStatus ? 'Verificando...' : 'Verificar status do pagamento'}
-                  </button>
                 </div>
               )}
             </>
