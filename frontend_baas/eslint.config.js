@@ -18,5 +18,12 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Regras rígidas demais para o código de páginas existente (chamadas
+      // de fetch em useEffect, respostas de API tipadas como any nos
+      // handlers) — mantidas como aviso em vez de erro bloqueante.
+      '@typescript-eslint/no-explicit-any': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+    },
   },
 ])

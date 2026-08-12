@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { extractErrorMessage } from '../lib/errors';
 
 function IconMail() {
   return (
@@ -95,11 +96,11 @@ export default function LoginPage() {
       if (mode === 'login') {
         await login(email.trim(), password);
       } else {
-        await register(email.trim(), password, name.trim() || undefined);
+        await register(email.trim(), password, name.trim());
       }
       navigate('/');
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Não foi possível autenticar. Verifique seus dados e tente novamente.');
+    } catch (err) {
+      setError(extractErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -172,6 +173,9 @@ export default function LoginPage() {
                   <input
                     id="name"
                     type="text"
+                    required
+                    minLength={2}
+                    maxLength={150}
                     autoComplete="organization"
                     placeholder="Ex.: Loja da Ana"
                     value={name}
