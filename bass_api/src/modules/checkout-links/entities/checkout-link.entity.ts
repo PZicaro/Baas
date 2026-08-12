@@ -44,6 +44,10 @@ export class CheckoutLink extends BaseEntity {
   @Column({ name: 'payer_phone', type: 'varchar', length: 20, nullable: true })
   payerPhone: string | null;
 
+  /** Obrigatório para Pix (CreatePixPaymentDto.payerDocument no gateway). */
+  @Column({ name: 'payer_document', type: 'varchar', length: 14, nullable: true })
+  payerDocument: string | null;
+
   /** Parcelas escolhidas (apenas para method = card). */
   @Column({ type: 'int', nullable: true })
   installments: number | null;

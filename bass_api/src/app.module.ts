@@ -7,6 +7,7 @@ import { CorrelationIdMiddleware } from './common/middleware/correlation-id.midd
 import { LoggerMiddleware } from './common/middleware/logger.middleware';
 import { AuthModule } from './modules/auth/auth.module';
 import { CheckoutLinksModule } from './modules/checkout-links/checkout-links.module';
+import { FeesModule } from './modules/fees/fees.module';
 import { GatewayAccountsModule } from './modules/gateway-accounts/gateway-accounts.module';
 import { HealthModule } from './modules/health/health.module';
 import { OrdersModule } from './modules/orders/orders.module';
@@ -42,6 +43,7 @@ import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
     UsersModule,
     AuthModule,
     GatewayAccountsModule,
+    FeesModule,
     CheckoutLinksModule,
     OrdersModule,
     TransactionsModule,

@@ -1,4 +1,11 @@
-import { BadGatewayException, HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  BadGatewayException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios, { AxiosInstance } from 'axios';
@@ -127,6 +134,23 @@ export class GatewayAccountsService {
       gatewayEmail: account.gatewayEmail,
       active: account.active,
     };
+  }
+
+  async getAuthenticatedClient(userId: string): Promise<AxiosInstance> {
+    const account = await this.gatewayAccountsRepository.findOne({ where: { userId } });
+    if (!account?.accessToken || !account.active) {
+      throw new ForbiddenException('Conecte a loja ao gateway (Lera Box) antes de continuar.');
+    }
+    return axios.create({
+      baseURL: this.configService.get<string>('gateway.baseUrl'),
+      timeout: 15_000,
+      headers: { Authorization: `Bearer ${account.accessToken}` },
+    });
+  }
+
+  async getDocument(userId: string): Promise<string | null> {
+    const account = await this.gatewayAccountsRepository.findOne({ where: { userId } });
+    return account?.documento ?? null;
   }
 
   async getStatus(userId: string): Promise<GatewayStatusDto> {

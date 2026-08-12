@@ -1,42 +1,46 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { extractErrorMessage } from '../lib/errors';
+import { maskCpfCnpj } from '../lib/masks';
+
+interface CheckoutLink {
+  id: string;
+  slug: string;
+  method: 'PIX' | 'CARD';
+  amountCents: number;
+  description: string | null;
+  externalReference: string;
+  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'COMPLETED';
+  createdAt: string;
+  expiresAt: string | null;
+}
 
 function formatCents(cents: number | string | undefined) {
   const value = Number(cents ?? 0) / 100;
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function paymentUrl(slug: string): string {
+  return `${window.location.origin}/pay/${slug}`;
+}
+
 export default function CheckoutPage() {
-  const [links, setLinks] = useState<any[]>([]);
+  const [links, setLinks] = useState<CheckoutLink[]>([]);
   const [method, setMethod] = useState<'PIX' | 'CARD'>('PIX');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
+  const [payerDocument, setPayerDocument] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  const [fees, setFees] = useState<any[]>([]);
-  const [activeLinkId, setActiveLinkId] = useState<string | null>(null);
-  const [installments, setInstallments] = useState(1);
-  const [brand, setBrand] = useState('VISA');
-  const [pixResult, setPixResult] = useState<Record<string, any>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   async function loadLinks() {
     const { data } = await api.get('/checkout/links');
     setLinks(data);
   }
 
-  async function loadFees() {
-    try {
-      const { data } = await api.get('/fees');
-      setFees(Array.isArray(data) ? data : data?.data ?? data?.fees ?? []);
-    } catch {
-      setFees([]);
-    }
-  }
-
   useEffect(() => {
     loadLinks();
-    loadFees();
   }, []);
 
   async function handleCreate(e: FormEvent) {
@@ -45,37 +49,32 @@ export default function CheckoutPage() {
     setLoading(true);
     try {
       const amountCents = Math.round(Number(amount.replace(',', '.')) * 100);
-      await api.post('/checkout/links', { method, amountCents, description });
+      await api.post('/checkout/links', {
+        method,
+        amountCents,
+        description: description || undefined,
+        payerDocument: method === 'PIX' ? payerDocument : undefined,
+      });
       setAmount('');
       setDescription('');
+      setPayerDocument('');
       await loadLinks();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Não foi possível criar o link.');
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Não foi possível criar o link.'));
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleGeneratePix(linkId: string) {
-    setError(null);
+  async function handleCopy(link: CheckoutLink) {
+    const url = paymentUrl(link.slug);
     try {
-      const { data } = await api.post(`/checkout/links/${linkId}/pix`);
-      setPixResult((prev) => ({ ...prev, [linkId]: data }));
-      await loadLinks();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Falha ao gerar cobrança Pix.');
+      await navigator.clipboard.writeText(url);
+    } catch {
+      // clipboard pode não estar disponível (ex.: contexto não seguro) — o link já fica visível no input.
     }
-  }
-
-  async function handlePayCard(linkId: string) {
-    setError(null);
-    try {
-      await api.post(`/checkout/links/${linkId}/card`, { installments, brand });
-      setActiveLinkId(null);
-      await loadLinks();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Falha ao processar cobrança de cartão.');
-    }
+    setCopiedId(link.id);
+    setTimeout(() => setCopiedId((prev) => (prev === link.id ? null : prev)), 2000);
   }
 
   return (
@@ -106,6 +105,19 @@ export default function CheckoutPage() {
           </div>
           <label>Descrição</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} />
+          {method === 'PIX' && (
+            <>
+              <label>CPF/CNPJ do pagador</label>
+              <input
+                required
+                inputMode="numeric"
+                placeholder="000.000.000-00"
+                maxLength={18}
+                value={payerDocument}
+                onChange={(e) => setPayerDocument(maskCpfCnpj(e.target.value))}
+              />
+            </>
+          )}
           {error && <div className="error">{error}</div>}
           <button type="submit" disabled={loading}>
             Criar link
@@ -115,6 +127,10 @@ export default function CheckoutPage() {
 
       <div className="card">
         <h2>Links de checkout</h2>
+        <p style={{ color: '#64748b', fontSize: 13, marginTop: -8 }}>
+          Compartilhe o link com o pagador — a cobrança (Pix ou cartão) acontece na página que ele
+          abrir, não aqui.
+        </p>
         {links.length === 0 && <p style={{ color: '#64748b' }}>Nenhum link criado ainda.</p>}
         {links.map((link) => (
           <div key={link.id} style={{ borderTop: '1px solid #e2e8f0', paddingTop: 12, marginTop: 12 }}>
@@ -122,81 +138,31 @@ export default function CheckoutPage() {
               <div>
                 <strong>{formatCents(link.amountCents)}</strong> · {link.method}
                 <div style={{ fontSize: 12, color: '#64748b' }}>{link.externalReference}</div>
+                {link.status === 'ACTIVE' && link.expiresAt && (
+                  <div style={{ fontSize: 12, color: '#64748b' }}>
+                    Expira em {new Date(link.expiresAt).toLocaleString('pt-BR')}
+                  </div>
+                )}
               </div>
               <span className={`badge ${link.status}`}>{link.status}</span>
             </div>
 
-            {link.method === 'PIX' && link.status === 'CREATED' && (
-              <button onClick={() => handleGeneratePix(link.id)}>Gerar cobrança Pix</button>
-            )}
-
-            {link.method === 'CARD' && link.status === 'CREATED' && (
-              <div>
-                <button onClick={() => setActiveLinkId(activeLinkId === link.id ? null : link.id)}>
-                  {activeLinkId === link.id ? 'Cancelar' : 'Pagar com cartão'}
+            {link.status === 'ACTIVE' && (
+              <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+                <input readOnly value={paymentUrl(link.slug)} style={{ flex: 1, fontSize: 12 }} />
+                <button type="button" onClick={() => handleCopy(link)}>
+                  {copiedId === link.id ? 'Copiado!' : 'Copiar link'}
                 </button>
-                {activeLinkId === link.id && (
-                  <div className="grid-2" style={{ marginTop: 8 }}>
-                    <div>
-                      <label>Parcelas</label>
-                      <select value={installments} onChange={(e) => setInstallments(Number(e.target.value))}>
-                        {Array.from({ length: 21 }, (_, i) => i + 1).map((n) => (
-                          <option key={n} value={n}>
-                            {n}x
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label>Bandeira</label>
-                      <select value={brand} onChange={(e) => setBrand(e.target.value)}>
-                        <option value="VISA">Visa</option>
-                        <option value="MASTER">Master</option>
-                        <option value="ELO">Elo</option>
-                      </select>
-                    </div>
-                    <button onClick={() => handlePayCard(link.id)}>Confirmar cobrança</button>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {pixResult[link.id]?.qrCodeBase64 && (
-              <div className="qr-box">
-                <img
-                  src={`data:image/png;base64,${pixResult[link.id].qrCodeBase64}`}
-                  alt="QR Code Pix"
-                />
-                <p style={{ fontSize: 12, wordBreak: 'break-all' }}>{pixResult[link.id].emv}</p>
+                <a href={paymentUrl(link.slug)} target="_blank" rel="noreferrer">
+                  <button type="button" className="secondary">
+                    Abrir
+                  </button>
+                </a>
               </div>
             )}
           </div>
         ))}
       </div>
-
-      {fees.length > 0 && (
-        <div className="card">
-          <h2>Taxas de cartão (GET /fees)</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Parcelas</th>
-                <th>Bandeira</th>
-                <th>Taxa</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fees.slice(0, 10).map((f, i) => (
-                <tr key={i}>
-                  <td>{f.installments ?? f.parcelas}x</td>
-                  <td>{f.brand ?? f.bandeira ?? '-'}</td>
-                  <td>{f.feePercent ?? f.fee ?? f.taxa}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
     </div>
   );
 }

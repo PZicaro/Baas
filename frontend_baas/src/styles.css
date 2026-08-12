@@ -154,7 +154,8 @@ td {
 .badge.DENIED { background: #fee2e2; color: var(--danger); }
 .badge.EXPIRED { background: #fef3c7; color: var(--warning); }
 .badge.CANCELLED { background: #f1f5f9; color: var(--muted); }
-.badge.PENDING, .badge.CREATED { background: #e0e7ff; color: var(--primary); }
+.badge.PENDING, .badge.CREATED, .badge.ACTIVE { background: #e0e7ff; color: var(--primary); }
+.badge.COMPLETED { background: #dcfce7; color: var(--success); }
 
 .balance {
   font-size: 32px;
