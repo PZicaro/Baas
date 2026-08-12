@@ -1,0 +1,44 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: baas-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: baas_db
+      MYSQL_USER: baas
+      MYSQL_PASSWORD: baas
+    ports:
+      # host 3307 -> container 3306 (evita conflito com um MySQL local já
+      # rodando na 3306 do host; a API se conecta via rede interna do
+      # compose usando o host "mysql" na porta 3306, sem ser afetada)
+      - '3307:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      target: build
+    container_name: baas-api
+    command: npm run start:dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./src:/app/src
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
