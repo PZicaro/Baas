@@ -116,7 +116,7 @@ Relacionamentos: `gateway_accounts.user_id → users.id` (1:1) · `checkout_link
    npm run start:dev
    ```
 
-A API sobe em `http://localhost:3000/api/v1` e a documentação Swagger em
+A API sobe em `http://localhost:3000/api` e a documentação Swagger em
 `http://localhost:3000/api/docs`.
 
 ## Scripts principais
@@ -139,9 +139,16 @@ A API sobe em `http://localhost:3000/api/v1` e a documentação Swagger em
 - **Logging**: middleware Nest loga método, rota, status e duração de cada
   requisição; o interceptor complementa com o handler (`Controller.method`)
   que atendeu.
-- **Autenticação**: `AuthModule` expõe `POST /auth/register` e `POST /auth/login`,
-  emitindo um JWT validado pela `JwtStrategy`. Rotas protegidas usam o
-  `JwtAuthGuard` (`@UseGuards(JwtAuthGuard)`), como em `UsersController`.
+- **Autenticação via cookie httpOnly**: `AuthModule` expõe `POST /auth/register`,
+  `POST /auth/login`, `POST /auth/logout` e `GET /auth/me`. O JWT nunca é
+  devolvido no corpo da resposta — é setado direto num cookie `baas_token`
+  (`httpOnly`, `sameSite=lax`, `secure` em produção), inacessível ao
+  JavaScript do frontend. A `JwtStrategy` lê o token exclusivamente desse
+  cookie (nunca de header `Authorization`). O frontend deve chamar a API com
+  `withCredentials: true` e usar `GET /auth/me` para restaurar a sessão ao
+  carregar a página (não há token para guardar em `localStorage`). Rotas
+  protegidas usam o `JwtAuthGuard` (`@UseGuards(JwtAuthGuard)`), como em
+  `UsersController`.
 
 ## Docker
 
