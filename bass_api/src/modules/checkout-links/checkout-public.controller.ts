@@ -5,12 +5,6 @@ import { CheckoutLinksService } from './checkout-links.service';
 import { CheckoutLinkResponseDto } from './dto/checkout-link-response.dto';
 import { PayCardDto } from './dto/pay-card.dto';
 
-/**
- * Rotas públicas (sem sessão do BaaS) usadas pela página de pagamento que o
- * pagador abre a partir do link compartilhado — /pay/:slug no frontend.
- * A identidade de quem recebe (e qual token do gateway usar) vem do próprio
- * link, nunca de quem está fazendo a requisição.
- */
 @ApiTags('checkout-public')
 @Controller('checkout/pay')
 export class CheckoutPublicController {

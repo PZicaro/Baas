@@ -155,9 +155,10 @@ export class CheckoutLinksService {
       userId: link.userId,
       method: PaymentMethod.PIX,
       amount: link.amount,
-      // O sandbox pode aprovar/negar o Pix já na resposta síncrona (ex.:
-      // "INSUFFICIENT_BALANCE") — nunca fica travado em PENDING à toa.
-      status: this.mapGatewayStatus(this.str(data.status)),
+      // O status da resposta síncrona é só preliminar — o resultado
+      // definitivo (aprovado/negado) vem depois, via checagem manual
+      // (GET /payments/:id) ou webhook. Nunca gravamos como final aqui.
+      status: OrderStatus.PENDING,
       externalReference: link.externalReference,
       gatewayPaymentId: this.str(data.id ?? data.paymentId),
       gatewayTxid: this.str(data.txid ?? data.txId),
@@ -217,7 +218,9 @@ export class CheckoutLinksService {
       amount: link.amount,
       installments: dto.installments,
       feePercent: String(feePercent),
-      status: this.mapGatewayStatus(this.str(data.status)),
+      // Mesma lógica do Pix: status inicial sempre PENDING, resultado
+      // definitivo só sai numa checagem posterior (GET /payments/:id).
+      status: OrderStatus.PENDING,
       externalReference: link.externalReference,
       gatewayPaymentId: this.str(data.id ?? data.paymentId),
       rawResponse: data,

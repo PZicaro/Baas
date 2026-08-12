@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { extractErrorMessage } from '../lib/errors';
+
+interface WalletTransaction {
+  id?: string;
+  createdAt?: string;
+  type?: string;
+  externalReference?: string;
+  reference?: string;
+  amount?: number;
+  amountCents?: number;
+  status?: string;
+}
 
 function formatCents(cents: number | string | undefined) {
   const value = Number(cents ?? 0) / 100;
@@ -16,7 +28,7 @@ const STATUS_FILTERS = [
 
 export default function DashboardPage() {
   const [balance, setBalance] = useState<number | null>(null);
-  const [transactions, setTransactions] = useState<any[]>([]);
+  const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
   const [status, setStatus] = useState('');
   const [type, setType] = useState('');
   const [loading, setLoading] = useState(true);
@@ -38,10 +50,10 @@ export default function DashboardPage() {
       const { data } = await api.get('/wallet/transactions', {
         params: { status: status || undefined, type: type || undefined, limit: 50 },
       });
-      setTransactions(Array.isArray(data) ? data : data?.data ?? data?.transactions ?? []);
-    } catch (err: any) {
+      setTransactions(Array.isArray(data) ? data : (data?.data ?? data?.transactions ?? []));
+    } catch (err) {
       setError(
-        err?.response?.data?.message ?? 'Não foi possível carregar o extrato. Conecte-se ao gateway primeiro.',
+        extractErrorMessage(err, 'Não foi possível carregar o extrato. Conecte-se ao gateway primeiro.'),
       );
     } finally {
       setLoading(false);

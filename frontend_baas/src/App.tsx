@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage';
 import CheckoutPage from './pages/CheckoutPage';
 import WithdrawalsPage from './pages/WithdrawalsPage';
 import WebhooksPage from './pages/WebhooksPage';
+import PublicPaymentPage from './pages/PublicPaymentPage';
 
 export default function App() {
   return (
@@ -14,6 +15,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/pay/:slug" element={<PublicPaymentPage />} />
           <Route
             element={
               <RequireAuth>

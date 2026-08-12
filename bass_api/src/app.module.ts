@@ -13,6 +13,7 @@ import { HealthModule } from './modules/health/health.module';
 import { OrdersModule } from './modules/orders/orders.module';
 import { TransactionsModule } from './modules/transactions/transactions.module';
 import { UsersModule } from './modules/users/users.module';
+import { WalletModule } from './modules/wallet/wallet.module';
 import { WebhooksModule } from './modules/webhooks/webhooks.module';
 import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
 
@@ -49,6 +50,7 @@ import { WithdrawalsModule } from './modules/withdrawals/withdrawals.module';
     TransactionsModule,
     WithdrawalsModule,
     WebhooksModule,
+    WalletModule,
   ],
 })
 export class AppModule implements NestModule {
