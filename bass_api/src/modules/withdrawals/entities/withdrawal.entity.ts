@@ -16,18 +16,18 @@ export class Withdrawal extends BaseEntity {
   user: User;
 
   @Index()
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'varchar', length: 36 })
   userId: string;
 
   @Index({ unique: true })
-  @Column({ name: 'gateway_withdrawal_id', length: 100, nullable: true })
+  @Column({ name: 'gateway_withdrawal_id', type: 'varchar', length: 100, nullable: true })
   gatewayWithdrawalId: string | null;
 
   @Column({ type: 'int' })
   amount: number;
 
   /** Chave Pix de destino (quando o saque for via Pix). */
-  @Column({ name: 'pix_key', length: 150, nullable: true })
+  @Column({ name: 'pix_key', type: 'varchar', length: 150, nullable: true })
   pixKey: string | null;
 
   /** Dados da conta de destino quando o saque não for via chave Pix. */

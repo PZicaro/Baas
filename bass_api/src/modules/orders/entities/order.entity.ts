@@ -19,7 +19,7 @@ export class Order extends BaseEntity {
   checkoutLink: CheckoutLink;
 
   @Index()
-  @Column({ name: 'checkout_link_id' })
+  @Column({ name: 'checkout_link_id', type: 'varchar', length: 36 })
   checkoutLinkId: string;
 
   /** Owner denormalizado para consultas rápidas e isolamento por conta. */
@@ -28,7 +28,7 @@ export class Order extends BaseEntity {
   user: User;
 
   @Index()
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'varchar', length: 36 })
   userId: string;
 
   @Column({ type: 'enum', enum: PaymentMethod })
@@ -53,11 +53,11 @@ export class Order extends BaseEntity {
 
   /** Id do pagamento retornado pelo gateway. */
   @Index()
-  @Column({ name: 'gateway_payment_id', length: 100, nullable: true })
+  @Column({ name: 'gateway_payment_id', type: 'varchar', length: 100, nullable: true })
   gatewayPaymentId: string | null;
 
   /** txid retornado pelo gateway para pagamentos Pix. */
-  @Column({ name: 'gateway_txid', length: 100, nullable: true })
+  @Column({ name: 'gateway_txid', type: 'varchar', length: 100, nullable: true })
   gatewayTxid: string | null;
 
   @Column({ name: 'qr_code_base64', type: 'longtext', nullable: true })

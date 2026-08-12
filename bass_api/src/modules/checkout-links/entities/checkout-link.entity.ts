@@ -18,7 +18,7 @@ export class CheckoutLink extends BaseEntity {
   user: User;
 
   @Index()
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'varchar', length: 36 })
   userId: string;
 
   /** Slug curto e único usado na URL pública do link de pagamento. */
@@ -35,13 +35,13 @@ export class CheckoutLink extends BaseEntity {
   @Column({ type: 'varchar', length: 255, nullable: true })
   description: string | null;
 
-  @Column({ name: 'payer_name', length: 150, nullable: true })
+  @Column({ name: 'payer_name', type: 'varchar', length: 150, nullable: true })
   payerName: string | null;
 
-  @Column({ name: 'payer_email', length: 180, nullable: true })
+  @Column({ name: 'payer_email', type: 'varchar', length: 180, nullable: true })
   payerEmail: string | null;
 
-  @Column({ name: 'payer_phone', length: 20, nullable: true })
+  @Column({ name: 'payer_phone', type: 'varchar', length: 20, nullable: true })
   payerPhone: string | null;
 
   /** Parcelas escolhidas (apenas para method = card). */

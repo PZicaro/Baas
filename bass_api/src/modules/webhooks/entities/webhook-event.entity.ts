@@ -15,7 +15,7 @@ export class WebhookEvent extends BaseEntity {
 
   /** Id do evento/recurso no gateway, quando informado (chave de idempotência). */
   @Index()
-  @Column({ name: 'external_event_id', length: 150, nullable: true })
+  @Column({ name: 'external_event_id', type: 'varchar', length: 150, nullable: true })
   externalEventId: string | null;
 
   /** Hash do corpo bruto, usado como fallback de idempotência sem external_event_id. */
@@ -24,7 +24,7 @@ export class WebhookEvent extends BaseEntity {
   payloadHash: string;
 
   /** Conteúdo de X-Lera-Box-Signature recebido no header, quando houver. */
-  @Column({ length: 255, nullable: true })
+  @Column({ type: 'varchar', length: 255, nullable: true })
   signature: string | null;
 
   @Column({ name: 'signature_valid', type: 'boolean', nullable: true })

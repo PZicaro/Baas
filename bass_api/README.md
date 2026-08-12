@@ -34,12 +34,44 @@ src/
 │   ├── interceptors/logging.interceptor.ts
 │   ├── decorators/{public,current-user}.decorator.ts
 │   ├── dto/pagination.dto.ts
-│   └── entities/base.entity.ts  # id (uuid), createdAt, updatedAt
+│   ├── entities/base.entity.ts  # id (uuid), createdAt, updatedAt
+│   └── enums/domain.enums.ts    # PaymentMethod, OrderStatus, WebhookEventType etc.
 └── modules/
     ├── auth/                    # registro, login, estratégia JWT, guard
     ├── users/                   # CRUD de usuários (entidade, DTOs, service, controller)
-    └── health/                  # GET /health (checagem da conexão com o MySQL)
+    ├── health/                  # GET /health (checagem da conexão com o MySQL)
+    ├── gateway-accounts/        # vínculo/credenciais da conta no gateway Lera Box
+    ├── checkout-links/          # links/sessões de checkout (Pix e cartão)
+    ├── orders/                  # pedidos e estado de processamento por tentativa
+    ├── transactions/            # espelho/conciliação do extrato do gateway
+    ├── withdrawals/             # solicitações de saque
+    └── webhooks/                # auditoria e idempotência dos callbacks do gateway
 ```
+
+> Os módulos de domínio (`gateway-accounts`, `checkout-links`, `orders`,
+> `transactions`, `withdrawals`, `webhooks`) por ora só registram suas
+> entidades no TypeORM — services/controllers/integração HTTP com o gateway
+> Lera Box entram na próxima etapa.
+
+## Modelo de dados
+
+Todas as tabelas usam `id` (uuid), `created_at` e `updated_at` herdados de
+`BaseEntity`. Valores monetários são sempre inteiros em **centavos**.
+
+| Tabela              | Finalidade                                                                 |
+| ------------------- | --------------------------------------------------------------------------- |
+| `users`              | Usuários da aplicação BaaS (lojista)                                        |
+| `gateway_accounts`   | Vínculo 1:1 com a conta no gateway (CodigoCliente, ChaveLoja, Bearer token) |
+| `checkout_links`     | Link/sessão de checkout: método, valor, taxa, expiração, `externalReference` |
+| `orders`             | Tentativa de pagamento originada de um `checkout_link`; estado do pedido    |
+| `transactions`       | Espelho do extrato do gateway (`GET /api/wallet/transactions`) para conciliação |
+| `withdrawals`        | Solicitações de saque e status (`POST/GET /api/withdrawals`)                |
+| `webhook_events`     | Auditoria e idempotência dos callbacks recebidos do gateway                 |
+
+Relacionamentos: `gateway_accounts.user_id → users.id` (1:1) · `checkout_links.user_id → users.id`
+· `orders.checkout_link_id → checkout_links.id` · `orders.user_id → users.id`
+· `transactions.user_id → users.id` · `transactions.order_id → orders.id` (nullable)
+· `withdrawals.user_id → users.id`.
 
 ## Pré-requisitos
 
@@ -60,19 +92,25 @@ src/
    cp .env.example .env
    ```
 
-3. Suba o MySQL (opcional, via Docker):
+3. Suba o MySQL (via Docker) **ou** use um MySQL já instalado localmente:
 
    ```bash
    docker compose up -d mysql
    ```
 
-4. Rode as migrations (com `DB_SYNCHRONIZE=false`, recomendado):
+4. Crie o banco (`CREATE DATABASE IF NOT EXISTS`, idempotente):
+
+   ```bash
+   npm run db:create
+   ```
+
+5. Rode as migrations (com `DB_SYNCHRONIZE=false`, recomendado):
 
    ```bash
    npm run migration:run
    ```
 
-5. Inicie a aplicação em modo desenvolvimento:
+6. Inicie a aplicação em modo desenvolvimento:
 
    ```bash
    npm run start:dev

@@ -19,14 +19,14 @@ export class Transaction extends BaseEntity {
   user: User;
 
   @Index()
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'varchar', length: 36 })
   userId: string;
 
   @ManyToOne(() => Order, { onDelete: 'SET NULL', nullable: true })
   @JoinColumn({ name: 'order_id' })
   order: Order | null;
 
-  @Column({ name: 'order_id', nullable: true })
+  @Column({ name: 'order_id', type: 'varchar', length: 36, nullable: true })
   orderId: string | null;
 
   /** Id da transação no gateway (idempotência da sincronização). */
@@ -44,7 +44,7 @@ export class Transaction extends BaseEntity {
   amount: number;
 
   @Index()
-  @Column({ name: 'external_reference', length: 100, nullable: true })
+  @Column({ name: 'external_reference', type: 'varchar', length: 100, nullable: true })
   externalReference: string | null;
 
   /** Payload bruto retornado pelo gateway para essa movimentação. */

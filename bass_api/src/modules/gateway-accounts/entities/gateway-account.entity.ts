@@ -18,7 +18,7 @@ export class GatewayAccount extends BaseEntity {
   user: User;
 
   @Index({ unique: true })
-  @Column({ name: 'user_id' })
+  @Column({ name: 'user_id', type: 'varchar', length: 36 })
   userId: string;
 
   /** CPF ou CNPJ usado no cadastro do gateway (pode ser fictício no sandbox). */
