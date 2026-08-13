@@ -15,6 +15,7 @@ import { User } from '../users/entities/user.entity';
 import { GatewayStatusDto } from './dto/gateway-status.dto';
 import { LoginGatewayDto } from './dto/login-gateway.dto';
 import { RegisterGatewayDto } from './dto/register-gateway.dto';
+import { ResetGatewayPasswordDto } from './dto/reset-gateway-password.dto';
 import { GatewayAccountsService } from './gateway-accounts.service';
 
 @ApiTags('gateway')
@@ -42,6 +43,15 @@ export class GatewayAccountsController {
   connect(@CurrentUser() user: User, @Body() dto: LoginGatewayDto): Promise<GatewayStatusDto> {
     this.logger.log(`POST /gateway/login chamado por user=${user.id} document=${dto.document}`);
     return this.gatewayAccountsService.connect(user.id, dto);
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Solicita reset de senha no gateway (proxy de POST /api/auth/reset-password)',
+  })
+  resetPassword(@Body() dto: ResetGatewayPasswordDto): Promise<{ message: string }> {
+    return this.gatewayAccountsService.resetPasswordAtGateway(dto);
   }
 
   @Get('status')

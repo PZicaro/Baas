@@ -16,6 +16,7 @@ import { toUpstreamHttpException } from '../../common/http/upstream-error.util';
 import { GatewayStatusDto } from './dto/gateway-status.dto';
 import { LoginGatewayDto } from './dto/login-gateway.dto';
 import { RegisterGatewayDto } from './dto/register-gateway.dto';
+import { ResetGatewayPasswordDto } from './dto/reset-gateway-password.dto';
 import { GatewayAccount } from './entities/gateway-account.entity';
 
 @Injectable()
@@ -70,6 +71,30 @@ export class GatewayAccountsService {
         this.logger,
         error,
         'Falha ao cadastrar no gateway.',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+  }
+
+  /** Reset de senha no gateway (POST /api/auth/reset-password, pública) — a senha nova sai por e-mail. */
+  async resetPasswordAtGateway(dto: ResetGatewayPasswordDto): Promise<{ message: string }> {
+    const url = `${this.http.defaults.baseURL}/auth/reset-password`;
+    this.logger.log(`-> POST ${url} document=${dto.document}`);
+
+    try {
+      const { data } = await this.http.post('/auth/reset-password', {
+        document: dto.document,
+        email: dto.email,
+      });
+      this.logger.log(`<- 200 /auth/reset-password resposta=${JSON.stringify(data)}`);
+      return {
+        message: data?.message ?? 'Nova senha enviada para o e-mail cadastrado no gateway.',
+      };
+    } catch (error) {
+      throw toUpstreamHttpException(
+        this.logger,
+        error,
+        'Falha ao solicitar redefinição de senha no gateway.',
         HttpStatus.BAD_REQUEST,
       );
     }
