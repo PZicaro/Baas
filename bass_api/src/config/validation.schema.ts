@@ -61,6 +61,10 @@ class EnvironmentVariables {
   @IsOptional()
   @IsString()
   JWT_EXPIRES_IN?: string;
+
+  @IsOptional()
+  @IsString()
+  PUBLIC_BASE_URL?: string;
 }
 
 /**

@@ -302,4 +302,77 @@ export class CheckoutLinksService {
   private str(value: unknown): string | null {
     return typeof value === 'string' && value.length > 0 ? value : null;
   }
+
+  /** Aceita string ou number nas chaves candidatas (mesma tolerância usada na integração de saída). */
+  private pick(payload: Record<string, unknown>, keys: string[]): string | null {
+    for (const key of keys) {
+      const value = payload?.[key];
+      if (typeof value === 'string' && value.length > 0) return value;
+      if (typeof value === 'number' && !Number.isNaN(value)) return String(value);
+    }
+    return null;
+  }
+
+  // ---------------------------------------------------------------------
+  // Webhooks (POST /api/webhooks/lera-box/payment-pix|payment-card) — ver
+  // WebhooksService. Separado em "localizar" (leitura, antes de validar a
+  // assinatura) e "aplicar" (escrita, só depois de validada).
+  // ---------------------------------------------------------------------
+
+  /**
+   * Localiza o pedido de um payload de webhook, sem aplicar nada.
+   *
+   * O payload real do gateway identifica a transação em `transactionId`
+   * (confirmado em produção — o Swagger não documenta esse schema);
+   * `id`/`paymentId` ficam só como fallback tolerante. Isso importa porque
+   * um link pode gerar mais de um pedido (nova tentativa após negado) e
+   * todos compartilham o mesmo `externalReference` — casar só por essa
+   * referência, sem o id da transação, pode aplicar o resultado no pedido
+   * errado quando há mais de uma tentativa pendente no mesmo link.
+   */
+  async findOrderForWebhook(payload: Record<string, unknown>): Promise<Order | null> {
+    const gatewayPaymentId = this.pick(payload, ['transactionId', 'id', 'paymentId']);
+    if (gatewayPaymentId) {
+      const byPaymentId = await this.ordersRepository.findOne({ where: { gatewayPaymentId } });
+      if (byPaymentId) return byPaymentId;
+    }
+
+    // Só cai aqui se o gateway não mandou nenhum id de transação — nesse
+    // caso, na dúvida entre várias tentativas do mesmo link, a mais
+    // recente ainda pendente é a única leitura que faz sentido.
+    const externalReference = this.pick(payload, ['externalReference']);
+    if (!externalReference) return null;
+    return this.ordersRepository.findOne({
+      where: { externalReference, status: OrderStatus.PENDING },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Aplica o retorno assíncrono definitivo (webhook) a um pedido já
+   * localizado: atualiza o pedido e, quando a tentativa não vingou
+   * (negado/expirado/cancelado), reabre o link de checkout pra uma nova
+   * tentativa em vez de deixá-lo preso em COMPLETED.
+   */
+  async applyPaymentWebhook(order: Order, payload: Record<string, unknown>): Promise<Order> {
+    order.status = this.mapGatewayStatus(this.str(payload.status));
+    order.rawResponse = payload;
+    if (order.status === OrderStatus.APPROVED && !order.paidAt) {
+      order.paidAt = new Date();
+    }
+    await this.ordersRepository.save(order);
+
+    if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.APPROVED) {
+      const link = await this.checkoutLinksRepository.findOne({
+        where: { id: order.checkoutLinkId },
+      });
+      if (link && link.status === CheckoutLinkStatus.COMPLETED) {
+        const stillValid = !link.expiresAt || link.expiresAt.getTime() > Date.now();
+        link.status = stillValid ? CheckoutLinkStatus.ACTIVE : CheckoutLinkStatus.EXPIRED;
+        await this.checkoutLinksRepository.save(link);
+      }
+    }
+
+    return order;
+  }
 }

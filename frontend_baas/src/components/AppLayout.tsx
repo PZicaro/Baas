@@ -37,7 +37,6 @@ export default function AppLayout() {
         </NavLink>
         <NavLink to="/checkout">Checkout</NavLink>
         <NavLink to="/withdrawals">Saques</NavLink>
-        <NavLink to="/webhooks">Webhooks</NavLink>
         <a
           href="#"
           onClick={(e) => {

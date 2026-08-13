@@ -12,6 +12,6 @@ import { CheckoutLink } from './entities/checkout-link.entity';
   imports: [TypeOrmModule.forFeature([CheckoutLink, Order]), GatewayAccountsModule, FeesModule],
   controllers: [CheckoutLinksController, CheckoutPublicController],
   providers: [CheckoutLinksService],
-  exports: [TypeOrmModule],
+  exports: [TypeOrmModule, CheckoutLinksService],
 })
 export class CheckoutLinksModule {}

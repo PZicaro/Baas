@@ -21,6 +21,8 @@ export interface AppConfig {
     baseUrl: string;
     encryptionKey: string;
   };
+  /** URL pública desta API (sem barra final) — usada pra montar os callbacks de webhook cadastrados no gateway. */
+  publicBaseUrl: string;
 }
 
 export default (): AppConfig => ({
@@ -49,4 +51,7 @@ export default (): AppConfig => ({
     encryptionKey:
       process.env.GATEWAY_ENCRYPTION_KEY ?? process.env.JWT_SECRET ?? 'change-me-in-production',
   },
+  publicBaseUrl: (
+    process.env.PUBLIC_BASE_URL ?? `http://localhost:${process.env.PORT ?? '3000'}/api`
+  ).replace(/\/+$/, ''),
 });

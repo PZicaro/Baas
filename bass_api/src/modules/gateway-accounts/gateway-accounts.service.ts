@@ -8,8 +8,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import axios, { AxiosInstance } from 'axios';
+import { randomBytes } from 'crypto';
 import { Repository } from 'typeorm';
 import { decryptSecret, encryptSecret } from '../../common/crypto/encryption.util';
+import { WEBHOOK_EVENT_SLUGS } from '../../common/enums/domain.enums';
 import { toUpstreamHttpException } from '../../common/http/upstream-error.util';
 import { GatewayStatusDto } from './dto/gateway-status.dto';
 import { LoginGatewayDto } from './dto/login-gateway.dto';
@@ -135,15 +137,86 @@ export class GatewayAccountsService {
     account.accessToken = accessToken;
     account.tokenExpiresAt = null;
     account.active = true;
+    // Gerado uma única vez e reaproveitado nos relogins seguintes — trocar o
+    // segredo a cada login invalidaria a assinatura de webhooks já em
+    // trânsito e obrigaria recadastrar do zero sem necessidade.
+    if (!account.webhookSecretEncrypted) {
+      account.webhookSecretEncrypted = encryptSecret(
+        randomBytes(24).toString('hex'),
+        encryptionKey,
+      );
+    }
 
     await this.gatewayAccountsRepository.save(account);
+
+    const webhooks = await this.registerWebhooksForUser(userId);
 
     return {
       connected: true,
       codigoCliente: account.codigoCliente,
       gatewayEmail: account.gatewayEmail,
       active: account.active,
+      webhooksRegistered: webhooks.every((w) => w.ok),
     };
+  }
+
+  /**
+   * Cadastra no gateway (POST /api/webhooks) um endpoint por evento
+   * (PAYMENT_PIX, PAYMENT_CARD, WITHDRAWAL), todos apontando pra essa API
+   * (ver WebhooksController) e assinados com o segredo desta conta. O
+   * próprio gateway trata isso como upsert por evento, então repetir é
+   * seguro — tanto automaticamente em todo login/relogin (ver `connect`)
+   * quanto sob demanda (POST /webhooks/register, ex.: depois de trocar a
+   * URL do túnel em dev sem precisar relogar no gateway).
+   *
+   * Nunca lança: um cadastro de webhook falhar não pode derrubar quem
+   * chamou — o lojista continua operando, só um evento fica sem callback.
+   */
+  async registerWebhooksForUser(
+    userId: string,
+    publicBaseUrlOverride?: string,
+  ): Promise<Array<{ event: string; url: string; ok: boolean }>> {
+    const account = await this.gatewayAccountsRepository.findOne({ where: { userId } });
+    if (!account?.accessToken || !account.active) {
+      throw new ForbiddenException('Conecte a loja ao gateway (Lera Box) antes de continuar.');
+    }
+
+    const encryptionKey = this.configService.get<string>('gateway.encryptionKey')!;
+    if (!account.webhookSecretEncrypted) {
+      account.webhookSecretEncrypted = encryptSecret(
+        randomBytes(24).toString('hex'),
+        encryptionKey,
+      );
+      await this.gatewayAccountsRepository.save(account);
+    }
+    const secret = decryptSecret(account.webhookSecretEncrypted, encryptionKey);
+
+    const client = axios.create({
+      baseURL: this.configService.get<string>('gateway.baseUrl'),
+      timeout: 15_000,
+      headers: { Authorization: `Bearer ${account.accessToken}` },
+    });
+    const publicBaseUrl = this.resolvePublicBaseUrl(publicBaseUrlOverride);
+
+    return Promise.all(
+      Object.entries(WEBHOOK_EVENT_SLUGS).map(async ([event, slug]) => {
+        const url = `${publicBaseUrl}/webhooks/lera-box/${slug}`;
+        try {
+          await client.post('/webhooks', { event, url, secret });
+          this.logger.log(`-> POST /webhooks cadastrado event=${event} url=${url}`);
+          return { event, url, ok: true };
+        } catch (error) {
+          this.logger.warn(
+            `Falha ao cadastrar webhook event=${event} url=${url}: ${
+              axios.isAxiosError(error)
+                ? JSON.stringify(error.response?.data ?? error.message)
+                : String(error)
+            }`,
+          );
+          return { event, url, ok: false };
+        }
+      }),
+    );
   }
 
   async getAuthenticatedClient(userId: string): Promise<AxiosInstance> {
@@ -219,6 +292,28 @@ export class GatewayAccountsService {
   decryptStoredPassword(account: GatewayAccount): string {
     const encryptionKey = this.configService.get<string>('gateway.encryptionKey')!;
     return decryptSecret(account.passwordEncrypted, encryptionKey);
+  }
+
+  /** Segredo usado pra validar X-Lera-Box-Signature nos webhooks deste usuário (null se nunca cadastrado). */
+  async getWebhookSecret(userId: string): Promise<string | null> {
+    const account = await this.gatewayAccountsRepository.findOne({ where: { userId } });
+    if (!account?.webhookSecretEncrypted) return null;
+    const encryptionKey = this.configService.get<string>('gateway.encryptionKey')!;
+    return decryptSecret(account.webhookSecretEncrypted, encryptionKey);
+  }
+
+  /**
+   * `PUBLIC_BASE_URL` (do .env) e o override manual (POST /webhooks/register)
+   * deveriam vir com o prefixo `/api`, mas é fácil colar só o domínio do
+   * túnel e esquecer — já aconteceu. Completa com `apiPrefix` quando
+   * faltar em qualquer uma das duas origens, em vez de gerar (de novo)
+   * uma URL de callback quebrada silenciosamente.
+   */
+  private resolvePublicBaseUrl(override?: string): string {
+    const apiPrefix = this.configService.get<string>('apiPrefix', 'api');
+    const source = override?.trim() || this.configService.get<string>('publicBaseUrl')!;
+    const base = source.replace(/\/+$/, '');
+    return base.endsWith(`/${apiPrefix}`) ? base : `${base}/${apiPrefix}`;
   }
 
   /** Aceita string ou number (ex.: codigoCliente vem como número na resposta real). */

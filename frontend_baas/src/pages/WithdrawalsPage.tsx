@@ -1,5 +1,17 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../services/api';
+import { extractErrorMessage } from '../lib/errors';
+
+interface Withdrawal {
+  id: string;
+  amountCents: number;
+  pixKey: string | null;
+  status: 'PENDING' | 'APPROVED' | 'DENIED' | 'CANCELLED';
+  requestedAt: string;
+  processedAt: string | null;
+  createdAt: string;
+  gatewayMessage: string | null;
+}
 
 function formatCents(cents: number | string | undefined) {
   const value = Number(cents ?? 0) / 100;
@@ -7,9 +19,10 @@ function formatCents(cents: number | string | undefined) {
 }
 
 export default function WithdrawalsPage() {
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
+  const [withdrawals, setWithdrawals] = useState<Withdrawal[]>([]);
   const [amount, setAmount] = useState('');
   const [pixKey, setPixKey] = useState('');
+  const [holderDocument, setHolderDocument] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -28,12 +41,13 @@ export default function WithdrawalsPage() {
     setLoading(true);
     try {
       const amountCents = Math.round(Number(amount.replace(',', '.')) * 100);
-      await api.post('/withdrawals', { amountCents, pixKey });
+      await api.post('/withdrawals', { amountCents, pixKey, document: holderDocument });
       setAmount('');
       setPixKey('');
+      setHolderDocument('');
       await load();
-    } catch (err: any) {
-      setError(err?.response?.data?.message ?? 'Não foi possível solicitar o saque.');
+    } catch (err) {
+      setError(extractErrorMessage(err, 'Não foi possível solicitar o saque.'));
     } finally {
       setLoading(false);
     }
@@ -60,6 +74,15 @@ export default function WithdrawalsPage() {
             <div>
               <label>Chave Pix de destino</label>
               <input required value={pixKey} onChange={(e) => setPixKey(e.target.value)} />
+            </div>
+            <div>
+              <label>CPF/CNPJ do titular da chave Pix</label>
+              <input
+                required
+                placeholder="Documento de quem recebe o saque"
+                value={holderDocument}
+                onChange={(e) => setHolderDocument(e.target.value)}
+              />
             </div>
           </div>
           {error && <div className="error">{error}</div>}
@@ -92,9 +115,14 @@ export default function WithdrawalsPage() {
               <tr key={w.id}>
                 <td>{new Date(w.createdAt).toLocaleString('pt-BR')}</td>
                 <td>{formatCents(w.amountCents)}</td>
-                <td>{w.pixKey ?? w.destinationAccount ?? '-'}</td>
+                <td>{w.pixKey ?? '-'}</td>
                 <td>
                   <span className={`badge ${w.status}`}>{w.status}</span>
+                  {w.gatewayMessage && (
+                    <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>
+                      {w.gatewayMessage}
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

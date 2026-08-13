@@ -49,3 +49,15 @@ export enum WebhookEventType {
   PAYMENT_CARD = 'PAYMENT_CARD',
   WITHDRAWAL = 'WITHDRAWAL',
 }
+
+/**
+ * Segmento de URL usado tanto pra cadastrar o webhook no gateway
+ * (GatewayAccountsService) quanto pra rotear o POST recebido de volta pro
+ * evento certo (WebhooksController) — uma única fonte de verdade pros dois
+ * lados, pra nunca ficarem dessincronizados.
+ */
+export const WEBHOOK_EVENT_SLUGS: Record<WebhookEventType, string> = {
+  [WebhookEventType.PAYMENT_PIX]: 'payment-pix',
+  [WebhookEventType.PAYMENT_CARD]: 'payment-card',
+  [WebhookEventType.WITHDRAWAL]: 'withdrawal',
+};

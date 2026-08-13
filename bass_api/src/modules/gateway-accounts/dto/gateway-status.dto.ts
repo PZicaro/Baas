@@ -12,4 +12,10 @@ export class GatewayStatusDto {
 
   @ApiPropertyOptional()
   active?: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'true se os 3 webhooks (PAYMENT_PIX, PAYMENT_CARD, WITHDRAWAL) foram cadastrados com sucesso no gateway nesta conexão',
+  })
+  webhooksRegistered?: boolean;
 }

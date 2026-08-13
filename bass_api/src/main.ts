@@ -11,6 +11,11 @@ import { setupSwagger } from './swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     bufferLogs: true,
+    // Necessário pra validar X-Lera-Box-Signature: o HMAC é calculado sobre
+    // o corpo bruto recebido, não sobre o JSON re-serializado (que pode
+    // diferir em espaçamento/ordem de chaves). Com isso o Nest expõe
+    // `request.rawBody` além do body já parseado.
+    rawBody: true,
   });
 
   const configService = app.get(ConfigService);

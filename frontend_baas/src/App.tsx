@@ -6,7 +6,6 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import CheckoutPage from './pages/CheckoutPage';
 import WithdrawalsPage from './pages/WithdrawalsPage';
-import WebhooksPage from './pages/WebhooksPage';
 import PublicPaymentPage from './pages/PublicPaymentPage';
 
 export default function App() {
@@ -26,7 +25,6 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/withdrawals" element={<WithdrawalsPage />} />
-            <Route path="/webhooks" element={<WebhooksPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

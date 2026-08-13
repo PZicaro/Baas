@@ -64,4 +64,14 @@ export class GatewayAccount extends BaseEntity {
 
   @Column({ default: true })
   active: boolean;
+
+  /**
+   * Segredo usado no cadastro dos webhooks (POST /api/webhooks) deste
+   * lojista no gateway — gerado uma vez por conta e cifrado do mesmo jeito
+   * que `passwordEncrypted`. É com ele que validamos X-Lera-Box-Signature
+   * nos callbacks recebidos.
+   */
+  @Column({ name: 'webhook_secret_encrypted', type: 'text', nullable: true })
+  @Exclude()
+  webhookSecretEncrypted: string | null;
 }
