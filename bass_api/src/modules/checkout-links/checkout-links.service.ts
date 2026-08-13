@@ -48,12 +48,40 @@ export class CheckoutLinksService {
     return this.checkoutLinksRepository.save(link);
   }
 
-  async findAllForUser(userId: string): Promise<CheckoutLink[]> {
+  /**
+   * `CheckoutLink.status` descreve o ciclo de vida do link em si (ativo,
+   * expirado...), não o resultado do pagamento — um link volta a `ACTIVE`
+   * depois de uma tentativa negada, pra permitir nova tentativa (ver
+   * `applyPaymentWebhook`). Sem o status do último pedido, o lojista não
+   * teria como ver que a tentativa anterior foi negada; por isso a lista
+   * traz `lastOrderStatus` junto com cada link.
+   */
+  async findAllForUser(
+    userId: string,
+  ): Promise<Array<CheckoutLink & { lastOrderStatus: OrderStatus | null }>> {
     const links = await this.checkoutLinksRepository.find({
       where: { userId },
       order: { createdAt: 'DESC' },
     });
-    return Promise.all(links.map((link) => this.applyExpiration(link)));
+    const expired = await Promise.all(links.map((link) => this.applyExpiration(link)));
+
+    const orders = await this.ordersRepository.find({
+      where: { userId },
+      order: { createdAt: 'DESC' },
+    });
+    const lastOrderStatusByLink = new Map<string, OrderStatus>();
+    for (const order of orders) {
+      // Orders vêm ordenados do mais recente pro mais antigo — a primeira
+      // ocorrência de cada checkoutLinkId já é a última tentativa.
+      if (!lastOrderStatusByLink.has(order.checkoutLinkId)) {
+        lastOrderStatusByLink.set(order.checkoutLinkId, order.status);
+      }
+    }
+
+    return expired.map((link) => ({
+      ...link,
+      lastOrderStatus: lastOrderStatusByLink.get(link.id) ?? null,
+    }));
   }
 
   async findOwned(userId: string, id: string): Promise<CheckoutLink> {

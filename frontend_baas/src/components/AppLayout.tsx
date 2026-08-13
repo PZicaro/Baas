@@ -44,7 +44,7 @@ export default function AppLayout() {
             setGatewayModalOpen(true);
           }}
         >
-          Conta no gateway {status?.connected ? '✅' : ''}
+          Conta no gateway
         </a>
         <div style={{ marginTop: 'auto', paddingTop: 24, fontSize: 12, color: '#94a3b8' }}>
           {user?.email}
@@ -62,6 +62,7 @@ export default function AppLayout() {
         open={gatewayModalOpen}
         onClose={() => setGatewayModalOpen(false)}
         onConnected={refreshGatewayStatus}
+        status={status}
       />
     </div>
   );

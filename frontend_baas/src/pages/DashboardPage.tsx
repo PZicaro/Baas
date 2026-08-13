@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { extractErrorMessage } from '../lib/errors';
+import { statusLabel } from '../lib/statusLabels';
 
 interface WalletTransaction {
   id?: string;
@@ -13,7 +14,7 @@ interface WalletTransaction {
   status?: string;
 }
 
-function formatCents(cents: number | string | undefined) {
+function formatCents(cents: number | string | null | undefined) {
   const value = Number(cents ?? 0) / 100;
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
@@ -25,6 +26,29 @@ const STATUS_FILTERS = [
   { label: 'Expirado', value: 'EXPIRED' },
   { label: 'Cancelado', value: 'CANCELLED' },
 ];
+
+// O extrato do gateway (GET /wallet/transactions) não segue exatamente o
+// TransactionType do backend — na prática já vimos "credit_card" em vez de
+// "CARD", por exemplo. Mapeia as variantes conhecidas; normalize() cobre
+// maiúscula/minúscula e "-"/"_" antes de bater com a chave.
+const TYPE_LABELS: Record<string, string> = {
+  PIX: 'Pix',
+  CARD: 'Cartão',
+  CREDIT_CARD: 'Cartão',
+  DEBIT_CARD: 'Cartão de débito',
+  WITHDRAWAL: 'Saque',
+  FEE: 'Tarifa',
+  OTHER: 'Outro',
+};
+
+function normalizeTypeKey(type: string): string {
+  return type.toUpperCase().replace(/[\s-]+/g, '_');
+}
+
+function typeLabel(type: string | undefined): string {
+  if (!type) return '-';
+  return TYPE_LABELS[normalizeTypeKey(type)] ?? type;
+}
 
 export default function DashboardPage() {
   const [balance, setBalance] = useState<number | null>(null);
@@ -75,7 +99,7 @@ export default function DashboardPage() {
 
       <div className="card">
         <label style={{ marginTop: 0 }}>Saldo disponível</label>
-        <div className="balance">{balance === null ? '—' : formatCents(balance)}</div>
+        <div className="balance">{formatCents(balance)}</div>
       </div>
 
       <div className="card">
@@ -121,11 +145,11 @@ export default function DashboardPage() {
               {transactions.map((tx, i) => (
                 <tr key={tx.id ?? i}>
                   <td>{tx.createdAt ? new Date(tx.createdAt).toLocaleString('pt-BR') : '-'}</td>
-                  <td>{tx.type ?? '-'}</td>
+                  <td>{typeLabel(tx.type)}</td>
                   <td>{tx.externalReference ?? tx.reference ?? '-'}</td>
                   <td>{formatCents(tx.amount ?? tx.amountCents)}</td>
                   <td>
-                    <span className={`badge ${tx.status ?? ''}`}>{tx.status ?? '-'}</span>
+                    <span className={`badge ${tx.status ?? ''}`}>{statusLabel(tx.status)}</span>
                   </td>
                 </tr>
               ))}

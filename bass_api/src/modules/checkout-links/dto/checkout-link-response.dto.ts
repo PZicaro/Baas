@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Exclude, Expose, Transform } from 'class-transformer';
-import { CheckoutLinkStatus } from '../../../common/enums/domain.enums';
+import { CheckoutLinkStatus, OrderStatus } from '../../../common/enums/domain.enums';
 
 @Exclude()
 export class CheckoutLinkResponseDto {
@@ -33,6 +33,14 @@ export class CheckoutLinkResponseDto {
   @ApiProperty({ enum: CheckoutLinkStatus })
   @Expose()
   status: CheckoutLinkStatus;
+
+  @ApiPropertyOptional({
+    enum: OrderStatus,
+    description:
+      'Status do último pedido gerado neste link (pode ser diferente de `status`: um link volta a ACTIVE depois de um pedido DENIED, pra permitir nova tentativa). Null se nenhuma cobrança foi gerada ainda.',
+  })
+  @Expose()
+  lastOrderStatus: OrderStatus | null;
 
   @ApiPropertyOptional()
   @Expose()

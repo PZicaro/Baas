@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { extractErrorMessage } from '../lib/errors';
+import { statusLabel } from '../lib/statusLabels';
 
 interface Withdrawal {
   id: string;
@@ -117,7 +118,7 @@ export default function WithdrawalsPage() {
                 <td>{formatCents(w.amountCents)}</td>
                 <td>{w.pixKey ?? '-'}</td>
                 <td>
-                  <span className={`badge ${w.status}`}>{w.status}</span>
+                  <span className={`badge ${w.status}`}>{statusLabel(w.status)}</span>
                   {w.gatewayMessage && (
                     <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: 2 }}>
                       {w.gatewayMessage}

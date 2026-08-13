@@ -3,6 +3,9 @@ import { api } from '../services/api';
 import { extractErrorMessage } from '../lib/errors';
 import { maskCpfCnpj } from '../lib/masks';
 
+type LinkStatus = 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'COMPLETED';
+type OrderStatus = 'PENDING' | 'APPROVED' | 'DENIED' | 'EXPIRED' | 'CANCELLED';
+
 interface CheckoutLink {
   id: string;
   slug: string;
@@ -10,9 +13,51 @@ interface CheckoutLink {
   amountCents: number;
   description: string | null;
   externalReference: string;
-  status: 'ACTIVE' | 'EXPIRED' | 'CANCELLED' | 'COMPLETED';
+  status: LinkStatus;
+  // Status da última cobrança gerada neste link — pode divergir de `status`
+  // (um link volta a ACTIVE depois de um pedido DENIED, pra permitir nova
+  // tentativa). Null se nenhuma cobrança foi gerada ainda.
+  lastOrderStatus: OrderStatus | null;
   createdAt: string;
   expiresAt: string | null;
+}
+
+const LINK_STATUS_LABELS: Record<LinkStatus, string> = {
+  ACTIVE: 'Ativo',
+  EXPIRED: 'Expirado',
+  CANCELLED: 'Cancelado',
+  COMPLETED: 'Concluído',
+};
+
+const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
+  PENDING: 'Aguardando confirmação',
+  APPROVED: 'Aprovado',
+  DENIED: 'Negado',
+  EXPIRED: 'Expirado',
+  CANCELLED: 'Cancelado',
+};
+
+/**
+ * O que importa pro lojista é o resultado do pagamento, não o ciclo de
+ * vida interno do link — por isso o status do último pedido tem
+ * prioridade sobre `link.status` quando existe (ex.: link já reaberto
+ * pra nova tentativa, mas a tentativa anterior foi negada).
+ */
+function displayStatus(link: CheckoutLink): { label: string; cssClass: string } {
+  if (link.lastOrderStatus) {
+    return { label: ORDER_STATUS_LABELS[link.lastOrderStatus], cssClass: link.lastOrderStatus };
+  }
+  return { label: LINK_STATUS_LABELS[link.status], cssClass: link.status };
+}
+
+/**
+ * O link volta a `ACTIVE` depois de um pedido negado (ver
+ * `applyPaymentWebhook` no backend) só pra quem já está com a página de
+ * pagamento aberta poder tentar de novo — não é um convite pro lojista
+ * sair compartilhando de novo um link cuja última tentativa falhou.
+ */
+function isShareable(link: CheckoutLink): boolean {
+  return link.status === 'ACTIVE' && link.lastOrderStatus !== 'DENIED';
 }
 
 function formatCents(cents: number | string | undefined) {
@@ -144,10 +189,12 @@ export default function CheckoutPage() {
                   </div>
                 )}
               </div>
-              <span className={`badge ${link.status}`}>{link.status}</span>
+              <span className={`badge ${displayStatus(link).cssClass}`}>
+                {displayStatus(link).label}
+              </span>
             </div>
 
-            {link.status === 'ACTIVE' && (
+            {isShareable(link) && (
               <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
                 <input readOnly value={paymentUrl(link.slug)} style={{ flex: 1, fontSize: 12 }} />
                 <button type="button" onClick={() => handleCopy(link)}>
