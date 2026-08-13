@@ -36,7 +36,9 @@ export function toUpstreamHttpException(
     const upstreamStatus = error.response?.status ?? HttpStatus.BAD_GATEWAY;
     const status = upstreamStatus === HttpStatus.UNAUTHORIZED ? unauthorizedAs : upstreamStatus;
     const body = error.response?.data;
-    logger.error(`<- ${upstreamStatus} código=${error.code ?? '-'} resposta=${JSON.stringify(body)}`);
+    logger.error(
+      `<- ${upstreamStatus} código=${error.code ?? '-'} resposta=${JSON.stringify(body)}`,
+    );
     const message = (body as { message?: string })?.message ?? fallback;
     return new HttpException(message, status);
   }
