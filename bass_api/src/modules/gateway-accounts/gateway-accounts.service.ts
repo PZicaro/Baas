@@ -1,7 +1,6 @@
 import {
   BadGatewayException,
   ForbiddenException,
-  HttpException,
   HttpStatus,
   Injectable,
   Logger,
@@ -11,6 +10,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import axios, { AxiosInstance } from 'axios';
 import { Repository } from 'typeorm';
 import { decryptSecret, encryptSecret } from '../../common/crypto/encryption.util';
+import { toUpstreamHttpException } from '../../common/http/upstream-error.util';
 import { GatewayStatusDto } from './dto/gateway-status.dto';
 import { LoginGatewayDto } from './dto/login-gateway.dto';
 import { RegisterGatewayDto } from './dto/register-gateway.dto';
@@ -64,7 +64,12 @@ export class GatewayAccountsService {
           'Cadastro enviado ao gateway. Verifique seu e-mail para receber documento, senha, CodigoCliente e ChaveLoja.',
       };
     } catch (error) {
-      throw this.toHttpException(error, 'Falha ao cadastrar no gateway.', url);
+      throw toUpstreamHttpException(
+        this.logger,
+        error,
+        'Falha ao cadastrar no gateway.',
+        HttpStatus.BAD_REQUEST,
+      );
     }
   }
 
@@ -86,7 +91,12 @@ export class GatewayAccountsService {
       response = data;
       this.logger.log(`<- 200 /auth/login resposta=${JSON.stringify(data)}`);
     } catch (error) {
-      throw this.toHttpException(error, 'Falha ao autenticar no gateway.', url);
+      throw toUpstreamHttpException(
+        this.logger,
+        error,
+        'Falha ao autenticar no gateway.',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     // Formato real confirmado em produção (o Swagger do gateway não
@@ -148,6 +158,46 @@ export class GatewayAccountsService {
     });
   }
 
+  /**
+   * Executa `fn` com um client autenticado no gateway; se a chamada falhar
+   * com 401 (token da loja expirado), reloga automaticamente com a senha
+   * salva ([[GatewayAccount.passwordEncrypted]]) e tenta de novo, uma única
+   * vez, antes de deixar o erro subir. Sem isso, todo mundo que depende do
+   * gateway (saldo, extrato, saques, cobranças) quebrava assim que o token
+   * expirasse, mesmo com a sessão do usuário na BaaS perfeitamente válida.
+   */
+  async withAuthenticatedClient<T>(
+    userId: string,
+    fn: (client: AxiosInstance) => Promise<T>,
+  ): Promise<T> {
+    const client = await this.getAuthenticatedClient(userId);
+    try {
+      return await fn(client);
+    } catch (error) {
+      if (!axios.isAxiosError(error) || error.response?.status !== HttpStatus.UNAUTHORIZED) {
+        throw error;
+      }
+      this.logger.warn(`Token do gateway expirado para userId=${userId}; relogando...`);
+      const refreshedClient = await this.reconnect(userId);
+      return fn(refreshedClient);
+    }
+  }
+
+  /** Refaz o login no gateway com a senha salva e devolve um client novo já autenticado. */
+  private async reconnect(userId: string): Promise<AxiosInstance> {
+    const account = await this.gatewayAccountsRepository.findOne({ where: { userId } });
+    if (!account?.passwordEncrypted) {
+      throw new ForbiddenException('Conecte a loja ao gateway (Lera Box) antes de continuar.');
+    }
+    await this.connect(userId, {
+      document: account.documento,
+      password: this.decryptStoredPassword(account),
+      email: account.gatewayEmail ?? undefined,
+      phone: account.gatewayPhone ?? undefined,
+    });
+    return this.getAuthenticatedClient(userId);
+  }
+
   async getDocument(userId: string): Promise<string | null> {
     const account = await this.gatewayAccountsRepository.findOne({ where: { userId } });
     return account?.documento ?? null;
@@ -165,10 +215,7 @@ export class GatewayAccountsService {
     };
   }
 
-  /**
-   * Descriptografa a senha salva — uso interno, para relogar no gateway
-   * quando o token expirar (ex.: num interceptor/job futuro).
-   */
+  /** Descriptografa a senha salva — usado por [[reconnect]] para relogar no gateway quando o token expira. */
   decryptStoredPassword(account: GatewayAccount): string {
     const encryptionKey = this.configService.get<string>('gateway.encryptionKey')!;
     return decryptSecret(account.passwordEncrypted, encryptionKey);
@@ -182,24 +229,5 @@ export class GatewayAccountsService {
       if (typeof value === 'number' && !Number.isNaN(value)) return String(value);
     }
     return null;
-  }
-
-  private toHttpException(error: unknown, fallback: string, url: string): HttpException {
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status ?? HttpStatus.BAD_GATEWAY;
-      const body = error.response?.data;
-      // Log completo do que o gateway respondeu — é a informação que mais
-      // importa pra debugar por que um cadastro/login foi rejeitado.
-      this.logger.error(
-        `<- ${status} ${url} código=${error.code ?? '-'} resposta=${JSON.stringify(body)}`,
-      );
-      const message = (body as { message?: string })?.message ?? fallback;
-      return new HttpException(message, status);
-    }
-    this.logger.error(
-      `<- falha de rede/inesperada em ${url}: ${fallback}`,
-      error instanceof Error ? error.stack : String(error),
-    );
-    return new HttpException(fallback, HttpStatus.BAD_GATEWAY);
   }
 }

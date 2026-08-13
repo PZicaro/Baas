@@ -1,9 +1,9 @@
 import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import axios from 'axios';
 import { randomBytes, randomUUID } from 'crypto';
 import { Repository } from 'typeorm';
 import { CheckoutLinkStatus, OrderStatus, PaymentMethod } from '../../common/enums/domain.enums';
+import { toUpstreamHttpException } from '../../common/http/upstream-error.util';
 import { FeesService } from '../fees/fees.service';
 import { GatewayAccountsService } from '../gateway-accounts/gateway-accounts.service';
 import { Order } from '../orders/entities/order.entity';
@@ -127,7 +127,6 @@ export class CheckoutLinksService {
       );
     }
 
-    const client = await this.gatewayAccountsService.getAuthenticatedClient(link.userId);
     const payload = {
       amount: link.amount,
       description: link.description ?? undefined,
@@ -138,11 +137,16 @@ export class CheckoutLinksService {
 
     let data: Record<string, unknown>;
     try {
-      const response = await client.post('/payments/pix', payload);
-      data = response.data;
-      this.logger.log(`<- 201 /payments/pix resposta=${JSON.stringify(data)}`);
+      data = await this.gatewayAccountsService.withAuthenticatedClient(
+        link.userId,
+        async (client) => {
+          const response = await client.post('/payments/pix', payload);
+          this.logger.log(`<- 201 /payments/pix resposta=${JSON.stringify(response.data)}`);
+          return response.data;
+        },
+      );
     } catch (error) {
-      throw this.toHttpException(error, 'Falha ao gerar a cobrança Pix no gateway.');
+      throw toUpstreamHttpException(this.logger, error, 'Falha ao gerar a cobrança Pix no gateway.');
     }
 
     // Uma tentativa por link neste modelo simples: uma vez que a cobrança
@@ -180,7 +184,6 @@ export class CheckoutLinksService {
     // oficial e usamos o valor de lá, evitando divergência com o gateway.
     const feePercent = await this.feesService.findFeePercent(dto.brand, dto.installments);
 
-    const client = await this.gatewayAccountsService.getAuthenticatedClient(link.userId);
     const payload = {
       amount: link.amount,
       description: link.description ?? undefined,
@@ -199,11 +202,16 @@ export class CheckoutLinksService {
 
     let data: Record<string, unknown>;
     try {
-      const response = await client.post('/payments/card', payload);
-      data = response.data;
-      this.logger.log(`<- 201 /payments/card resposta=${JSON.stringify(data)}`);
+      data = await this.gatewayAccountsService.withAuthenticatedClient(
+        link.userId,
+        async (client) => {
+          const response = await client.post('/payments/card', payload);
+          this.logger.log(`<- 201 /payments/card resposta=${JSON.stringify(response.data)}`);
+          return response.data;
+        },
+      );
     } catch (error) {
-      throw this.toHttpException(error, 'Falha ao processar o pagamento no gateway.');
+      throw toUpstreamHttpException(this.logger, error, 'Falha ao processar o pagamento no gateway.');
     }
 
     link.installments = dto.installments;
@@ -246,18 +254,22 @@ export class CheckoutLinksService {
       );
     }
 
-    const client = await this.gatewayAccountsService.getAuthenticatedClient(link.userId);
     this.logger.log(`-> GET /payments/${order.gatewayPaymentId}`);
 
     let data: Record<string, unknown>;
     try {
-      const response = await client.get(`/payments/${order.gatewayPaymentId}`);
-      data = response.data;
-      this.logger.log(
-        `<- 200 /payments/${order.gatewayPaymentId} resposta=${JSON.stringify(data)}`,
+      data = await this.gatewayAccountsService.withAuthenticatedClient(
+        link.userId,
+        async (client) => {
+          const response = await client.get(`/payments/${order.gatewayPaymentId}`);
+          this.logger.log(
+            `<- 200 /payments/${order.gatewayPaymentId} resposta=${JSON.stringify(response.data)}`,
+          );
+          return response.data;
+        },
       );
     } catch (error) {
-      throw this.toHttpException(error, 'Falha ao consultar o pagamento no gateway.');
+      throw toUpstreamHttpException(this.logger, error, 'Falha ao consultar o pagamento no gateway.');
     }
 
     order.status = this.mapGatewayStatus(this.str(data.status));
@@ -277,19 +289,5 @@ export class CheckoutLinksService {
 
   private str(value: unknown): string | null {
     return typeof value === 'string' && value.length > 0 ? value : null;
-  }
-
-  private toHttpException(error: unknown, fallback: string): HttpException {
-    if (axios.isAxiosError(error)) {
-      const status = error.response?.status ?? HttpStatus.BAD_GATEWAY;
-      const body = error.response?.data;
-      this.logger.error(
-        `<- ${status} código=${error.code ?? '-'} resposta=${JSON.stringify(body)}`,
-      );
-      const message = (body as { message?: string })?.message ?? fallback;
-      return new HttpException(message, status);
-    }
-    this.logger.error(fallback, error instanceof Error ? error.stack : String(error));
-    return new HttpException(fallback, HttpStatus.BAD_GATEWAY);
   }
 }
