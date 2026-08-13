@@ -146,7 +146,11 @@ export class CheckoutLinksService {
         },
       );
     } catch (error) {
-      throw toUpstreamHttpException(this.logger, error, 'Falha ao gerar a cobrança Pix no gateway.');
+      throw toUpstreamHttpException(
+        this.logger,
+        error,
+        'Falha ao gerar a cobrança Pix no gateway.',
+      );
     }
 
     // Uma tentativa por link neste modelo simples: uma vez que a cobrança
@@ -211,7 +215,11 @@ export class CheckoutLinksService {
         },
       );
     } catch (error) {
-      throw toUpstreamHttpException(this.logger, error, 'Falha ao processar o pagamento no gateway.');
+      throw toUpstreamHttpException(
+        this.logger,
+        error,
+        'Falha ao processar o pagamento no gateway.',
+      );
     }
 
     link.installments = dto.installments;
@@ -269,7 +277,11 @@ export class CheckoutLinksService {
         },
       );
     } catch (error) {
-      throw toUpstreamHttpException(this.logger, error, 'Falha ao consultar o pagamento no gateway.');
+      throw toUpstreamHttpException(
+        this.logger,
+        error,
+        'Falha ao consultar o pagamento no gateway.',
+      );
     }
 
     order.status = this.mapGatewayStatus(this.str(data.status));
